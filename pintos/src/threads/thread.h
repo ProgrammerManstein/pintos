@@ -4,7 +4,8 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include <threads/synch.h>
+#include "fixed_point.h"
+#include "threads/synch.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -26,24 +27,25 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 
-/* Our Implementatio for exec and wait:
-Child process for a parent's process which does fork */
-struct child
+#ifdef USERPROG
+/* Thread info used in parent thread's children list.
+   If store in thread, it will be freed after thread exit. */
+struct child_info
   {
-    tid_t tid;                           /* tid of the thread */
-    bool isrun;                          /* whether the child's thread is run successfully */
-    struct list_elem child_elem;         /* list of children */
-    struct semaphore sema;               /* semaphore to control waiting */
-    int store_exit;                      /* the exit status of child thread */
+    tid_t tid;
+    struct list_elem childelem;   /* Used in parent thread's children list. */
+    int exit_code;
+    struct thread *thread;
+    struct semaphore sema;
   };
 
-/* File that the thread open */
-struct thread_file
+struct file_elem
   {
     int fd;
-    struct file* file;
-    struct list_elem file_elem;
+    struct file *file;
+    struct list_elem elem;
   };
+#endif
 
 /* A kernel thread or user process.
 
@@ -109,47 +111,54 @@ struct thread
     char name[16];                      /* Name (for debugging purposes). */
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
+    int origin_priority;                /* Origin priority which not got by priority donation. */
+
     struct list_elem allelem;           /* List element for all threads list. */
+    struct list_elem waitelem;          /* List element for wait threads list. */
 
     /* Shared between thread.c and synch.c. */
-    struct list_elem elem;              /* List element. */
+    struct list_elem elem;              /* List element in ready list or sema waiters. */
+
+    struct list locks;                  /* The locks list for this thread holds. */
+    struct lock *waiting_lock;          /* The lock which this thread waiting for. */
+
+    int64_t sleep_ticks;                /* Ticks when awake */
+
+    int nice;
+    fixed_t recent_cpu;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
+    struct thread *parent;              /* The thread of who create this thread. */
+    struct list children;               /* The thread that this thread created. */
+    struct child_info *child_info;      /* Child thread info for parent thread use. */
+    int exit_code;                      /* Thread exit code, -1 for init. */
+    struct semaphore sema;              /* Semaphore for child process to block parent until program loaded. */
+    int child_success;                  /* Keep whether child process is start successfully;. */
+    struct list files;                  /* List of opened files. */
+    int fd_counter;                     /* For get next fd. */
+    struct file *self_exec_file;        /* Its executable file */
 #endif
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
-
-    /* Our implementation for struct thread to store useful information */
-    /* Structure for Task2 */
-    struct list childs;                 /* The list of childs */
-    struct child * thread_child;        /* Store the child of this thread */
-    int st_exit;                        /* Exit status */
-    struct semaphore sema;              /* Control the child process's logic, finish parent waiting for child */
-    bool success;                       /* Judge whehter the child's thread execute successfully */
-    struct thread* parent;              /* Parent thread of the thread */
-    
-    /* Structure for Task3 */
-    struct list files;                  /* List of opened files */
-    int file_fd;                        /* File's descriptor */
-    struct file * file_owned;           /* The file opened */
-
   };
-
-
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-void acquire_lock_f(void);
-void release_lock_f(void);
+
 void thread_init (void);
 void thread_start (void);
 
-void thread_tick (void);
+#ifdef USERPROG
+void acquire_file_lock (void);
+void release_file_lock (void);
+#endif
+
+void thread_tick (int64_t ticks);
 void thread_print_stats (void);
 
 typedef void thread_func (void *aux);
@@ -157,6 +166,9 @@ tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
 void thread_block (void);
 void thread_unblock (struct thread *);
+
+void thread_sleep_until (int64_t wake_tick);
+void thread_wake (int64_t ticks);
 
 struct thread *thread_current (void);
 tid_t thread_tid (void);
@@ -171,11 +183,15 @@ void thread_foreach (thread_action_func *, void *);
 
 int thread_get_priority (void);
 void thread_set_priority (int);
+void thread_priority_donate (struct thread *t, int new_priority);
+bool thread_priority_greater_compare (const struct list_elem *a, const struct list_elem *b, void *aux);
 
 int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
-
+void thread_mlfqs_update_priority (struct thread *t);
+void thread_mlfqs_increase_recent_cpu (void);
+void thread_mlfqs_update_load_avg_and_recent_cpu (void);
 
 #endif /* threads/thread.h */

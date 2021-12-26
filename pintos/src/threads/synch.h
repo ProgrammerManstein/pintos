@@ -17,11 +17,15 @@ bool sema_try_down (struct semaphore *);
 void sema_up (struct semaphore *);
 void sema_self_test (void);
 
+void show_waiters (struct semaphore *);
+
 /* Lock. */
 struct lock 
   {
     struct thread *holder;      /* Thread holding lock (for debugging). */
     struct semaphore semaphore; /* Binary semaphore controlling access. */
+    struct list_elem elem;      /* Used in thread's locks list. */
+    int highest_priority;
   };
 
 void lock_init (struct lock *);
