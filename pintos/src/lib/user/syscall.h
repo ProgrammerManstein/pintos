@@ -2,7 +2,6 @@
 #define __LIB_USER_SYSCALL_H
 
 #include <stdbool.h>
-#include <stdint.h>
 #include <debug.h>
 
 /* Process identifier. */
@@ -34,7 +33,6 @@ int write (int fd, const void *buffer, unsigned length);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
-int practice (int i);
 
 /* Project 3 and optionally project 4. */
 mapid_t mmap (int fd, void *addr);
@@ -46,8 +44,5 @@ bool mkdir (const char *dir);
 bool readdir (int fd, char name[READDIR_MAX_LEN + 1]);
 bool isdir (int fd);
 int inumber (int fd);
-
-/* Homework 5, Part B. */
-void* sbrk (intptr_t increment);
 
 #endif /* lib/user/syscall.h */

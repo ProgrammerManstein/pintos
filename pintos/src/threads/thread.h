@@ -3,12 +3,9 @@
 
 #include <debug.h>
 #include <list.h>
+#include "synch.h"
 #include <stdint.h>
-#include "threads/synch.h"
-#include "threads/fixed-point.h"
-
-/*Floating point operation logic implementation*/
-#include"threads/fixed-point.h"
+#include "fixed_point.h"
 
 /* States in a thread's life cycle. */
 enum thread_status
@@ -90,26 +87,20 @@ struct thread
     /* Owned by thread.c. */
     tid_t tid;                          /* Thread identifier. */
     enum thread_status status;          /* Thread state. */
+    int base_priority;                  /* Base priority. */
+    struct list locks;                  /* Locks that the thread is holding. */
+    struct lock *lock_waiting;          /* The lock that the thread is waiting for. */
     char name[16];                      /* Name (for debugging purposes). */
+    int nice;
+    int recent_cpu;
     uint8_t *stack;                     /* Saved stack pointer. */
     int priority;                       /* Priority. */
     struct list_elem allelem;           /* List element for all threads list. */
+    int st_exit;
 
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
-
-    /*Record the time the thread has been blocked*/
-    int64_t ticks_blocked;
-    
-    /*For priority donation*/
-    int base_priority;    //base priority
-    struct list locks;    //locks that threads is holding
-    struct lock*lock_waiting; //the lock that the thread is waiting for
-
-    /*For MLFQS*/
-    int nice;   //nice
-    fixed_t recent_cpu; //recent CPU
-    
+    int64_t sleep_ticks;
 
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
@@ -156,37 +147,15 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-void blocked_thread_check (struct thread *t,void *aux);
-
-/* priority compare function. */
 bool thread_cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
-
-/*For priority donation*/
-/* Donate current priority to thread t. */
-void thread_donate_priority (struct thread *t);
-
-/* Update priority. */
-void thread_update_priority (struct thread *t);
-
-/*For MLFQS*/
-
-/* Increase recent_cpu by 1. */
+void thread_hold_the_lock (struct lock *);
+void thread_remove_lock (struct lock *);
+void thread_donate_priority (struct thread *);
+void thread_update_priority (struct thread *);
+bool thread_priority_large(const struct list_elem *, const struct list_elem *, void *);
+void wake_up (struct thread *t, void *);
+bool cmp_priority (const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
 void thread_mlfqs_increase_recent_cpu_by_one (void);
-
-/* Every per second to refresh load_avg and recent_cpu of all threads. */
-void thread_mlfqs_update_load_avg_and_recent_cpu (void);
-
-/* Update priority. */
-void thread_mlfqs_update_priority (struct thread *t);
-
-/*mlfqs*/
-
-/* Increase recent_cpu by 1. */
-void thread_mlfqs_increase_recent_cpu_by_one (void);
-
-/*mlfqs Update priority. */
-void thread_mlfqs_update_priority (struct thread *t);
-
-/* Every per second to refresh load_avg and recent_cpu of all threads. */
+void thread_mlfqs_update_priority (struct thread *);
 void thread_mlfqs_update_load_avg_and_recent_cpu (void);
 #endif /* threads/thread.h */
