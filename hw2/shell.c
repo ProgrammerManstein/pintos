@@ -93,7 +93,7 @@ int cmd_cd(struct tokens *tokens) {
 int cmd_wait(struct tokens *tokens) {
   int status;
   pid_t pid;
-  while(pid = wait(&status)) {
+  while((pid = wait(&status))) {
     if(pid == -1){
       printf("wait child error.\n");
       break;
