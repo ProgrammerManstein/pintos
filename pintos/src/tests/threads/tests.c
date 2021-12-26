@@ -31,7 +31,7 @@ static const struct test tests[] =
     {"priority-condvar", test_priority_condvar},
     {"mlfqs-load-1", test_mlfqs_load_1},
     {"mlfqs-load-60", test_mlfqs_load_60},
-    //{"mlfqs-load-avg", test_mlfqs_load_avg},
+    {"mlfqs-load-avg", test_mlfqs_load_avg},
     {"mlfqs-recent-1", test_mlfqs_recent_1},
     {"mlfqs-fair-2", test_mlfqs_fair_2},
     {"mlfqs-fair-20", test_mlfqs_fair_20},
