@@ -2,10 +2,9 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include "userprog/gdt.h"
-#include "userprog/syscall.h"
 #include "threads/interrupt.h"
 #include "threads/thread.h"
-
+#include "userprog/syscall.h"
 /* Number of page faults processed. */
 static long long page_fault_cnt;
 
@@ -87,29 +86,25 @@ kill (struct intr_frame *f)
     case SEL_UCSEG:
       /* User's code segment, so it's a user exception, as we
          expected.  Kill the user process.  */
-      exit_process(-1);
-      NOT_REACHED();      
       printf ("%s: dying due to interrupt %#04x (%s).\n",
               thread_name (), f->vec_no, intr_name (f->vec_no));
       intr_dump_frame (f);
+      thread_exit ();
 
     case SEL_KCSEG:
       /* Kernel's code segment, which indicates a kernel bug.
          Kernel code shouldn't throw exceptions.  (Page faults
          may cause kernel exceptions--but they shouldn't arrive
          here.)  Panic the kernel to make the point.  */
-      exit_process(-1);       
-      NOT_REACHED();      
       intr_dump_frame (f);
       PANIC ("Kernel bug - unexpected interrupt in kernel"); 
 
     default:
       /* Some other code segment?  Shouldn't happen.  Panic the
          kernel. */
-      exit_process(-1);       
-      NOT_REACHED();         
       printf ("Interrupt %#04x (%s) in unknown segment %04x\n",
              f->vec_no, intr_name (f->vec_no), f->cs);
+      thread_exit ();
     }
 }
 
@@ -152,9 +147,13 @@ page_fault (struct intr_frame *f)
   not_present = (f->error_code & PF_P) == 0;
   write = (f->error_code & PF_W) != 0;
   user = (f->error_code & PF_U) != 0;
-
-  if (lock_held_by_current_thread(&filesys_lock))
-    lock_release(&filesys_lock);
+   //IF USER ERROR IS FALSE THEN PUT THE RETURN ADDRESS INTO EIP AND RETURN ERROR INTO EAX
+   if (!user)
+   {
+      f->eip = f->eax;
+      f->eax = -1;
+      return;
+   }
 
   /* To implement virtual memory, delete the rest of the function
      body, and replace it with code that brings in the page to

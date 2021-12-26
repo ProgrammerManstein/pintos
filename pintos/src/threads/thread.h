@@ -4,7 +4,6 @@
 #include <debug.h>
 #include <list.h>
 #include <stdint.h>
-#include <kernel/list.h>
 #include <threads/synch.h>
 
 /* States in a thread's life cycle. */
@@ -27,9 +26,24 @@ typedef int tid_t;
 #define PRI_MAX 63                      /* Highest priority. */
 
 
+/* Our Implementatio for exec and wait:
+Child process for a parent's process which does fork */
+struct child
+  {
+    tid_t tid;                           /* tid of the thread */
+    bool isrun;                          /* whether the child's thread is run successfully */
+    struct list_elem child_elem;         /* list of children */
+    struct semaphore sema;               /* semaphore to control waiting */
+    int store_exit;                      /* the exit status of child thread */
+  };
 
-struct lock filesys_lock; //a global lock on filesystem operations, to ensure thread safety.
-#define INIT_EXIT_STAT -2333 
+/* File that the thread open */
+struct thread_file
+  {
+    int fd;
+    struct file* file;
+    struct list_elem file_elem;
+  };
 
 /* A kernel thread or user process.
 
@@ -76,7 +90,6 @@ struct lock filesys_lock; //a global lock on filesystem operations, to ensure th
          dynamic allocation with malloc() or palloc_get_page()
          instead.
 
-
    The first symptom of either of these problems will probably be
    an assertion failure in thread_current(), which checks that
    the `magic' member of the running thread's `struct thread' is
@@ -88,8 +101,6 @@ struct lock filesys_lock; //a global lock on filesystem operations, to ensure th
    only because they are mutually exclusive: only a thread in the
    ready state is on the run queue, whereas only a thread in the
    blocked state is on a semaphore wait list. */
-
-
 struct thread
   {
     /* Owned by thread.c. */
@@ -103,18 +114,6 @@ struct thread
     /* Shared between thread.c and synch.c. */
     struct list_elem elem;              /* List element. */
 
-    int64_t waketick;
-    bool load_success;  //if the child process is loaded successfully
-    struct semaphore load_sema;   // semaphore to keep the thread waiting until it makes sure whether the child process if successfully loaded.
-    int exit_status;    
-    struct list children_list;
-    struct thread* parent;   
-    struct file *self;  // its executable file
-    struct list opened_files;     //all the opened files
-    int fd_count;
-    //struct semaphore child_lock;
-    struct child_process * waiting_child;  //pid of the child process it is currently waiting
-
 #ifdef USERPROG
     /* Owned by userprog/process.c. */
     uint32_t *pagedir;                  /* Page directory. */
@@ -122,25 +121,31 @@ struct thread
 
     /* Owned by thread.c. */
     unsigned magic;                     /* Detects stack overflow. */
+
+    /* Our implementation for struct thread to store useful information */
+    /* Structure for Task2 */
+    struct list childs;                 /* The list of childs */
+    struct child * thread_child;        /* Store the child of this thread */
+    int st_exit;                        /* Exit status */
+    struct semaphore sema;              /* Control the child process's logic, finish parent waiting for child */
+    bool success;                       /* Judge whehter the child's thread execute successfully */
+    struct thread* parent;              /* Parent thread of the thread */
+    
+    /* Structure for Task3 */
+    struct list files;                  /* List of opened files */
+    int file_fd;                        /* File's descriptor */
+    struct file * file_owned;           /* The file opened */
+
   };
 
-  struct child_process {
-      int tid;
-      struct list_elem child_elem;   // element of itself point to its parent's child_list
-      int exit_status;   //store its exit status to pass it to its parent 
-          
-      /*whether the child process has been waited()
-      according to the document: a process may wait for any given child at most once.
-      if_waited would be initialized to false*/
-      bool if_waited;
-      struct semaphore wait_sema;
-    };
+
 
 /* If false (default), use round-robin scheduler.
    If true, use multi-level feedback queue scheduler.
    Controlled by kernel command-line option "-o mlfqs". */
 extern bool thread_mlfqs;
-
+void acquire_lock_f(void);
+void release_lock_f(void);
 void thread_init (void);
 void thread_start (void);
 
@@ -172,10 +177,5 @@ void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
 
-bool cmp_waketick(struct list_elem *first, struct list_elem *second, void *aux);
 
 #endif /* threads/thread.h */
-
-#ifdef USERPROG
-struct list_elem *find_children_list(tid_t child_tid);
-#endif
