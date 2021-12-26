@@ -45,7 +45,6 @@
 void
 pit_configure_channel (int channel, int mode, int frequency)
 {
-  frequency *= 16;
   uint16_t count;
   enum intr_level old_level;
 
